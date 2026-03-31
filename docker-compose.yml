@@ -1,0 +1,54 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: phongkham_sqlserver
+    environment:
+      SA_PASSWORD: "PhongKham@2024"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Express"
+    ports:
+      - "1434:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "PhongKham@2024" -Q "SELECT 1" -No -C
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api:
+    build:
+      context: ./src/MedicalAppointmentBooking.Api
+      dockerfile: Dockerfile
+    container_name: phongkham_api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=MedicalAppointmentBooking;User Id=sa;Password=PhongKham@2024;TrustServerCertificate=True
+      - Jwt__Issuer=MedicalAppointmentBooking
+      - Jwt__Audience=MedicalAppointmentBooking
+      - Jwt__Key=CHANGE_ME_TO_A_LONG_RANDOM_SECRET_KEY
+      - Jwt__AccessTokenMinutes=60
+    ports:
+      - "5169:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    volumes:
+      - api_uploads:/app/wwwroot/uploads
+
+  web:
+    build:
+      context: ./MedicalAppointmentBooking.Web
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE_URL=http://localhost:5169
+    container_name: phongkham_web
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  sqlserver_data:
+  api_uploads:
